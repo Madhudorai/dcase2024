@@ -518,3 +518,76 @@ def ssl_SHmethod_broad(mic_signals, fs, mic_pos_sph, Theta_l, Phi_l, method, sph
                               vmax_value=None, source_est=source_positions)
         return out, source_positions
     
+
+def ssl_SHmethod_broad2(ambisonic_signals, fs, Theta_l, Phi_l, method, plot_method, resolution, num_sources=1):
+    """
+    This script implements SSL algorithms in the spherical domain using B-format input
+    :param ambisonic_signals: B-format signals (W,X,Y,Z) with shape (num_frames, 4)
+    :param fs: Sampling frequency
+    :param Theta_l: The elevation of the source
+    :param Phi_l: The azimuth of the source
+    :param method: The chosen algorithm
+    :param plot_method: The method of plotting (2D or 3D)
+    :param resolution: The resolution for the grid in the space
+    :param num_sources: The number of sound sources
+    :return: A figure, estimate azimuth, estimate elevation
+    """
+    # Transform the inputs to lists
+    if not isinstance(Theta_l, list):
+        Theta_l = [Theta_l]
+    if not isinstance(Phi_l, list):
+        Phi_l = [Phi_l]
+
+    # Constants
+    c = 343  # Velocity of sound
+    K = int(fs * 0.1)  # Frame length for 100ms hop sizframe_length = int(fs * 0.1)  # 100ms = 0.1 sec
+    num_samples = ambisonic_signals.shape[0]
+    num_frames = num_samples // K
+    
+    # Create search grid
+    theta = np.arange(0, np.pi, resolution / 180 * np.pi)
+    phi = np.arange(0, 2 * np.pi, resolution / 180 * np.pi)
+    
+    # Process only the 10th frame
+    frame_idx = 10
+    if frame_idx >= num_frames:
+        frame_idx = num_frames - 1  # Use last frame if 10th frame doesn't exist
+    
+    # Get B-format coefficients for the 10th frame
+    W = ambisonic_signals[frame_idx, 0]  # 0th order
+    X = ambisonic_signals[frame_idx, 1]  # 1st order x
+    Y = ambisonic_signals[frame_idx, 2]  # 1st order y
+    Z = ambisonic_signals[frame_idx, 3]  # 1st order z
+    
+    # Initialize output
+    Out = np.zeros((len(theta), len(phi)), dtype=complex)
+    
+    if method == "DAS":
+        for num1 in range(len(theta)):
+            for num2 in range(len(phi)):
+                # Calculate steering vector for current direction
+                # For first-order Ambisonics, we use the spherical harmonics directly
+                Y00 = 1  # 0th order
+                Y1m1 = np.sin(theta[num1]) * np.cos(phi[num2])  # 1st order x
+                Y10 = np.cos(theta[num1])  # 1st order z
+                Y11 = np.sin(theta[num1]) * np.sin(phi[num2])  # 1st order y
+                
+                # Calculate beamformer output
+                temp = (W * Y00 + X * Y1m1 + Y * Y11 + Z * Y10)
+                Out[num1, num2] = np.abs(temp)
+    
+    # Convert to dB and clip values
+    out = 20 * np.log10(np.abs(Out))
+    out = out - np.max(out)
+    out = np.clip(out, -10, None)
+    
+    # Find source positions
+    x, y = np.where(out == np.max(out))
+    source_positions = [(i * resolution, j * resolution) for i, j in zip(x, y)]
+    
+    # Plot results
+    plot_SSL_results(out, Theta_l, Phi_l, plot_method, method, 'Real Data', 'open', vmin_value=None,
+                    vmax_value=None, source_est=source_positions)
+    
+    return out, source_positions
+  
