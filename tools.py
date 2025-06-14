@@ -316,7 +316,7 @@ def ssl_SHmethod_broad(mic_signals, fs, mic_pos_sph, Theta_l, Phi_l, method, sph
 
 
     if signal_type == "Multiple":
-        N = 4
+        N = 1 #4
         # Calculate the range of frequency: ka
         freq_up = round(K*c*N/(fs*2*np.pi*radius))
         freq_low = round(freq_up/2)+1
@@ -519,75 +519,69 @@ def ssl_SHmethod_broad(mic_signals, fs, mic_pos_sph, Theta_l, Phi_l, method, sph
         return out, source_positions
     
 
-def ssl_SHmethod_broad2(ambisonic_signals, fs, Theta_l, Phi_l, method, plot_method, resolution, num_sources=1):
+def ssl_SHmethod_broad2(ambisonic_signals, fs, resolution, method, 
+                                    plot_method, Theta_gt=None, Phi_gt=None, 
+                                    plot_frame_id=None):
     """
-    This script implements SSL algorithms in the spherical domain using B-format input
-    :param ambisonic_signals: B-format signals (W,X,Y,Z) with shape (num_frames, 4)
-    :param fs: Sampling frequency
-    :param Theta_l: The elevation of the source
-    :param Phi_l: The azimuth of the source
-    :param method: The chosen algorithm
-    :param plot_method: The method of plotting (2D or 3D)
-    :param resolution: The resolution for the grid in the space
-    :param num_sources: The number of sound sources
-    :return: A figure, estimate azimuth, estimate elevation
+    Run SSL over all frames and return estimated DOA per frame.
+    Optionally plots for one frame.
     """
-    # Transform the inputs to lists
-    if not isinstance(Theta_l, list):
-        Theta_l = [Theta_l]
-    if not isinstance(Phi_l, list):
-        Phi_l = [Phi_l]
+    # Convert single angles to lists if needed
+    if not isinstance(Theta_gt, list):
+        Theta_gt = [Theta_gt]
+    if not isinstance(Phi_gt, list):
+        Phi_gt = [Phi_gt]
 
-    # Constants
-    c = 343  # Velocity of sound
-    K = int(fs * 0.1)  # Frame length for 100ms hop sizframe_length = int(fs * 0.1)  # 100ms = 0.1 sec
+    K = int(fs * 0.1)  # 100ms frame length
     num_samples = ambisonic_signals.shape[0]
     num_frames = num_samples // K
     
-    # Create search grid
-    theta = np.arange(0, np.pi, resolution / 180 * np.pi)
-    phi = np.arange(0, 2 * np.pi, resolution / 180 * np.pi)
+    # Create search grid in radians
+    # theta (elevation): [-90, 90] degrees -> [-pi/2, pi/2] radians
+    # phi (azimuth): [-180, 180] degrees -> [-pi, pi] radians
+    theta_grid = np.arange(-np.pi/2, np.pi/2 + resolution/180*np.pi, resolution/180*np.pi)
+    phi_grid = np.arange(-np.pi, np.pi + resolution/180*np.pi, resolution/180*np.pi)
     
-    # Process only the 10th frame
-    frame_idx = 10
-    if frame_idx >= num_frames:
-        frame_idx = num_frames - 1  # Use last frame if 10th frame doesn't exist
-    
-    # Get B-format coefficients for the 10th frame
-    W = ambisonic_signals[frame_idx, 0]  # 0th order
-    X = ambisonic_signals[frame_idx, 1]  # 1st order x
-    Y = ambisonic_signals[frame_idx, 2]  # 1st order y
-    Z = ambisonic_signals[frame_idx, 3]  # 1st order z
-    
-    # Initialize output
-    Out = np.zeros((len(theta), len(phi)), dtype=complex)
-    
-    if method == "DAS":
-        for num1 in range(len(theta)):
-            for num2 in range(len(phi)):
-                # Calculate steering vector for current direction
-                # For first-order Ambisonics, we use the spherical harmonics directly
-                Y00 = 1  # 0th order
-                Y1m1 = np.sin(theta[num1]) * np.cos(phi[num2])  # 1st order x
-                Y10 = np.cos(theta[num1])  # 1st order z
-                Y11 = np.sin(theta[num1]) * np.sin(phi[num2])  # 1st order y
-                
-                # Calculate beamformer output
-                temp = (W * Y00 + X * Y1m1 + Y * Y11 + Z * Y10)
-                Out[num1, num2] = np.abs(temp)
-    
-    # Convert to dB and clip values
-    out = 20 * np.log10(np.abs(Out))
-    out = out - np.max(out)
-    out = np.clip(out, -10, None)
-    
-    # Find source positions
-    x, y = np.where(out == np.max(out))
-    source_positions = [(i * resolution, j * resolution) for i, j in zip(x, y)]
-    
-    # Plot results
-    plot_SSL_results(out, Theta_l, Phi_l, plot_method, method, 'Real Data', 'open', vmin_value=None,
-                    vmax_value=None, source_est=source_positions)
-    
-    return out, source_positions
-  
+    doa_results = []
+
+    for frame_idx in range(num_frames):
+        frame = ambisonic_signals[frame_idx * K:(frame_idx + 1) * K, :]
+        
+        # Average FOA over the frame (simple energy-mean)
+        W = np.mean(frame[:, 0])
+        X = np.mean(frame[:, 1])
+        Y = np.mean(frame[:, 2])
+        Z = np.mean(frame[:, 3])
+
+        Out = np.zeros((len(theta_grid), len(phi_grid)), dtype=complex)
+
+        if method == "DAS":
+            for i, theta in enumerate(theta_grid):
+                for j, phi in enumerate(phi_grid):
+                    Y00 = 1
+                    Y1m1 = np.sin(theta) * np.cos(phi)  # X
+                    Y10  = np.cos(theta)                # Z
+                    Y11  = np.sin(theta) * np.sin(phi)  # Y
+
+                    temp = W * Y00 + X * Y1m1 + Y * Y11 + Z * Y10
+                    Out[i, j] = np.abs(temp)
+
+        # Convert to dB and normalize
+        out_db = 20 * np.log10(np.abs(Out) + 1e-12)
+        out_db -= np.max(out_db)
+        out_db = np.clip(out_db, -10, None)
+
+        # Find max response
+        x, y = np.unravel_index(np.argmax(out_db), out_db.shape)
+        elev_deg = theta_grid[x] * 180 / np.pi
+        azim_deg = phi_grid[y] * 180 / np.pi
+
+        doa_results.append([frame_idx, azim_deg, elev_deg])
+
+        # Only plot for one frame
+        if plot_frame_id is not None and frame_idx == plot_frame_id:
+            plot_SSL_results(out_db, Theta_gt, Phi_gt, plot_method, method,
+                          'Real Data', 'open', vmin_value=None,
+                          vmax_value=None, source_est=[(elev_deg, azim_deg)])
+
+    return doa_results

@@ -105,7 +105,7 @@ def plot_SSL_results(out, Theta_l_rad_list, Phi_l_rad_list, plot_type, method, s
     Phi_l_deg_list = [angle * 180 / np.pi for angle in Phi_l_rad_list]
     if plot_type == "2D":
         plt.figure(figsize=(10, 8), dpi=250)
-        im = plt.imshow(out, origin='lower', extent=[0, 360, 0, 180], aspect='auto', cmap='jet', vmin=vmin_value,
+        im = plt.imshow(out, origin='lower', extent=[-180, 180, -90, 90], aspect='auto', cmap='jet', vmin=vmin_value,
                    vmax=vmax_value)
         cb = plt.colorbar(im, label='[dB]')
         cb.ax.tick_params(labelsize=16)  
@@ -127,7 +127,7 @@ def plot_SSL_results(out, Theta_l_rad_list, Phi_l_rad_list, plot_type, method, s
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection="3d")
 
-        phi, theta = np.meshgrid(np.linspace(0, 2 * np.pi, 360), np.linspace(0, np.pi, 180))
+        phi, theta = np.meshgrid(np.linspace(-np.pi, np.pi, 360), np.linspace(-np.pi/2, np.pi/2, 180))
         phi_deg = np.rad2deg(phi)
         theta_deg = np.rad2deg(theta)
 
