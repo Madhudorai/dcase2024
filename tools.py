@@ -115,7 +115,7 @@ def setRoom(room_dim, mic_arrays_car, source_pos_car_list, signal_list, typ, rt6
             for i, (source_pos_car, signal) in enumerate(zip(source_pos_car_list, signal_list)):
                 room.add_source(source_pos_car, signal=signal, delay=0)
             room.simulate()
-            output_dir = '/content/Classical-Sound-Source-Localization-Algorithms-in-Spherical-Domain/Anechoic/Array_output_{}/'.format(array_id)
+            output_dir = '/content/dcase2024/Anechoic/Array_output_{}/'.format(array_id)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
             for i in range(len(source_pos_car_list)):
@@ -131,7 +131,7 @@ def setRoom(room_dim, mic_arrays_car, source_pos_car_list, signal_list, typ, rt6
             for i, (source_pos_car, signal) in enumerate(zip(source_pos_car_list, signal_list)):
                 room.add_source(source_pos_car, signal=signal, delay=0)
             room.simulate()
-            output_dir = '/content/Classical-Sound-Source-Localization-Algorithms-in-Spherical-Domain/Reverberant/Array_output_{}/'.format(array_id)
+            output_dir = '/content/dcase2024/Reverberant/Array_output_{}/'.format(array_id)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
             for i in range(len(source_pos_car_list)):
